@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foochow Hero: Let's learn Foochow!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap');
+
+        :root {
+            --primary: #FF6B6B;
+            --secondary: #4ECDC4;
+            --accent: #FFE66D;
+            --dark: #292F36;
+            --light: #F7FFF7;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--light);
+            color: var(--dark);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        h1, h2, h3 { font-family: 'Fredoka One', cursive; color: var(--primary); text-align: center; }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            flex: 1;
+            position: relative;
+        }
+
+        .screen { display: none; animation: fadeIn 0.5s ease-in-out; }
+        .screen.active { display: block; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        button {
+            font-family: 'Fredoka One', cursive;
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            margin: 5px;
+        }
+        button:hover { transform: scale(1.05); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        button.danger { background-color: var(--primary); }
+        button.warning { background-color: var(--accent); color: var(--dark); }
+
+        input, select {
+            font-family: 'Nunito', sans-serif;
+            padding: 10px;
+            font-size: 1rem;
+            border: 2px solid var(--secondary);
+            border-radius: 10px;
+            margin: 5px 0;
+            width: calc(100% - 24px);
+            box-sizing: border-box;
+        }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1px)); gap: 15px; justify-content: center;}
+        .theme-card {
+            background: white;
+            border: 4px solid var(--accent);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        .theme-card:hover { background: var(--accent); }
+        .vocab-list-item { display: flex; justify-content: space-between; background: #eee; padding: 10px; margin-bottom: 5px; border-radius: 5px; align-items: center;}
+
+        /* Game CSS */
+        .balloon {
+            position: absolute;
+            bottom: -150px;
+            width: 75px; height: 95px;
+            border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--dark); font-weight: bold; cursor: pointer;
+            animation: floatUp linear infinite;
+            box-shadow: inset -10px -10px 15px rgba(0,0,0,0.1);
+            text-align: center; font-size: 0.9rem; padding: 5px; line-height: 1.1;
+            z-index: 5;
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        .balloon::after {
+            content: ''; position: absolute; bottom: -15px; left: 50%;
+            transform: translateX(-50%); width: 2px; height: 35px; background: gray;
+        }
+        @keyframes floatUp { to { bottom: 120%; } }
+        
+        .scatter-img {
+            transition: transform 0.2s;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            background: white; padding: 5px;
+        }
+        .scatter-img:hover { transform: scale(1.3) rotate(5deg); z-index: 10; border-color: var(--primary);}
+
+        /* Modal styling */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-content { background: white; padding: 20px; border-radius: 15px; text-align: center; max-width: 300px; width: 80%; }
+    </style>
+</head>
+<body>
+
+    <div class="nav-bar" style="display: flex; justify-content: space-between; padding: 10px 20px; background: var(--secondary); color: white;">
+        <h2 style="margin: 0; color: white;">Foochow Hero 🦸‍♂️</h2>
+        <div id="nav-buttons" style="display:none;">
+            <button class="warning" style="padding: 5px 15px; font-size: 0.9rem;" onclick="switchScreen('login')">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        
+        <div id="screen-loading" class="screen active" style="text-align: center; margin-top: 50px;">
+            <h1>Loading Data... ⏳</h1>
+            <p>Fetching the latest words!</p>
+        </div>
+
+        <div id="screen-login" class="screen">
+            <h1>Welcome to Foochow Fun! 🌟</h1>
+            
+            <div style="text-align: center; margin-bottom: 20px;">
+                <img src="https://api.dicebear.com/7.x/micah/svg?seed=Grandpa&backgroundColor=b6e3f4" alt="Ah Gong" style="border-radius: 50%; width: 80px; height: 80px; border: 3px solid var(--secondary); margin: 5px;">
+                <img src="https://api.dicebear.com/7.x/micah/svg?seed=Grandma&backgroundColor=ffdfbf" alt="Ah Ma" style="border-radius: 50%; width: 80px; height: 80px; border: 3px solid var(--accent); margin: 5px;">
+                <img src="https://api.dicebear.com/7.x/micah/svg?seed=Father&backgroundColor=c0aede" alt="Ba Ba" style="border-radius: 50%; width: 80px; height: 80px; border: 3px solid var(--primary); margin: 5px;">
+                <img src="https://api.dicebear.com/7.x/micah/svg?seed=Mother&backgroundColor=ffd5dc" alt="Ma Ma" style="border-radius: 50%; width: 80px; height: 80px; border: 3px solid var(--secondary); margin: 5px;">
+            </div>
+
+            <div style="text-align: center; max-width: 300px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                <h3>Player Access</h3>
+                <button onclick="login('user')">Start Playing!</button>
+                
+                <div style="margin-top: 30px;">
+                    <button class="secondary" style="font-size: 0.9rem; padding: 8px 15px;" onclick="toggleAdminLogin()">⚙️ Admin Access</button>
+                </div>
+
+                <div id="admin-login-section" style="display: none; margin-top: 15px; border-top: 2px dashed #eee; padding-top: 15px;">
+                    <input type="password" id="admin-pass" placeholder="Enter Password">
+                    <button class="danger" onclick="login('admin')">Login</button>
+                    <p id="login-msg" style="color: red; font-size: 0.9rem; margin: 5px 0 0 0;"></p>
+                </div>
+            </div>
+        </div>
+
+        <div id="screen-dashboard" class="screen">
+            <h1>Choose Your Adventure! 🚀</h1>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button onclick="startQuizSetup()" class="warning">🎮 Play Quiz Game</button>
+                <button onclick="switchScreen('leaderboard')" class="danger">🏆 Leaderboard</button>
+            </div>
+            <h3>Explore Themes</h3>
+            <div class="grid" id="theme-grid"></div>
+        </div>
+
+        <div id="screen-admin" class="screen">
+            <h1>Admin Control Panel ⚙️</h1>
+            <button onclick="switchScreen('login')">Back to Home</button>
+            
+            <div style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px; border: 3px solid var(--primary);">
+                <h3>🌐 Publish Updates to GitHub</h3>
+                <p style="font-size: 0.9rem; color: gray;">After adding new words or audio, download your data file and upload it to your GitHub repository to update the live website!</p>
+                <button class="warning" onclick="exportData()" style="width: 100%;">⬇️ Download data.json</button>
+            </div>
+
+            <div style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px;">
+                <h3>📂 Add New Theme</h3>
+                <input type="text" id="new-theme-name" placeholder="Theme Name (e.g., Fruits, School)">
+                <button class="secondary" onclick="addNewTheme()">Add Theme</button>
+                <p id="theme-msg" style="color: green; font-weight: bold; margin-top: 5px;"></p>
+            </div>
+
+            <div style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px;">
+                <h3>Change Admin Password</h3>
+                <input type="password" id="new-admin-pass" placeholder="Enter New Password">
+                <button class="danger" onclick="changeAdminPassword()">Update Password</button>
+                <p id="pass-msg" style="color: green; font-weight: bold; margin-top: 10px;"></p>
+            </div>
+
+            <div style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px;">
+                <h3>Add New Vocabulary</h3>
+                <select id="admin-theme-select"></select>
+                <input type="text" id="admin-foochow" placeholder="Foochow Word (e.g., Ngu ho)">
+                <input type="text" id="admin-english" placeholder="English Meaning (e.g., Hello)">
+                
+                <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                    <button id="record-btn" class="warning" onclick="toggleRecording()">🎙️ Start Recording</button>
+                    <button id="save-vocab-btn" class="secondary" onclick="addVocab()">➕ Add & Save</button>
+                </div>
+                <p style="font-size: 0.8rem; color: gray;">Note: Keep recordings short (1-2 seconds) to save space!</p>
+                <p id="admin-msg" style="color: green; font-weight: bold;"></p>
+            </div>
+
+            <div style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px;">
+                <h3>Current Vocabulary</h3>
+                <div id="admin-vocab-list"></div>
+            </div>
+        </div>
+
+        <div id="screen-theme" class="screen">
+            <button onclick="switchScreen('dashboard')">⬅️ Back</button>
+            <h1 id="theme-title">Theme</h1>
+            <div id="learning-list" class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));"></div>
+        </div>
+
+        <div id="screen-quiz-setup" class="screen">
+            <h1>Quiz Time! 🧠</h1>
+            <div style="text-align: center; background: white; padding: 30px; border-radius: 15px;">
+                <h3>Select Difficulty</h3>
+                <button onclick="startQuiz('easy')">Easy (Slow Time)</button>
+                <button class="warning" onclick="startQuiz('medium')">Medium (Normal)</button>
+                <button class="danger" onclick="startQuiz('hard')">Hard (Fast!)</button>
+            </div>
+        </div>
+
+        <div id="screen-quiz" class="screen">
+            <div style="display: flex; justify-content: space-between;">
+                <h3>Question: <span id="q-counter">1/20</span></h3>
+                <h3>Score: <span id="q-score">0</span></h3>
+            </div>
+            <div id="game-board"></div>
+        </div>
+
+        <div id="screen-quiz-end" class="screen">
+            <h1>Quiz Complete! 🎉</h1>
+            <div style="text-align: center; background: white; padding: 30px; border-radius: 15px;">
+                <h2>You scored <span id="final-score">0</span> points!</h2>
+                <p>Enter your name for the leaderboard:</p>
+                <input type="text" id="player-name" placeholder="Your Name" style="max-width: 250px;">
+                <button class="warning" onclick="saveScore()">Save Score</button>
+                <br><br>
+                <button class="secondary" onclick="switchScreen('dashboard')">Skip & Return Home</button>
+            </div>
+        </div>
+
+        <div id="screen-leaderboard" class="screen">
+            <h1>Top Heroes 🏆</h1>
+            <button onclick="switchScreen('dashboard')">⬅️ Back</button>
+            <div id="leaderboard-list" style="background: white; padding: 20px; border-radius: 15px; margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <footer style="background-color: var(--dark); color: white; text-align: center; padding: 15px; font-family: 'Nunito', sans-serif; margin-top: auto;">
+        Foochow Hero Learning App
+    </footer>
+
+    <!-- Custom Alert Modal -->
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modal-title">Notice</h3>
+            <p id="modal-text"></p>
+            <button onclick="closeModal()">OK</button>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE ---
+        let adminPassword = 'FoochowFun123';
+        let defaultThemes = ["Greetings", "Family", "Food", "Numbers", "Animals"];
+        let dbThemes = [...defaultThemes];
+        let vocabData = {}; 
+        let leaderboard = [];
+
+        // --- INITIALIZATION & GITHUB FETCH ---
+        async function initApp() {
+            try {
+                // Try to fetch the data.json file if hosted on GitHub
+                const response = await fetch('data.json');
+                if (response.ok) {
+                    const data = await response.json();
+                    if(data.themes) dbThemes = data.themes;
+                    if(data.vocabData) vocabData = data.vocabData;
+                    if(data.adminPassword) adminPassword = data.adminPassword;
+                    if(data.leaderboard) leaderboard = data.leaderboard;
+                    console.log("Loaded data from data.json!");
+                } else {
+                    throw new Error("No data.json found, loading local data.");
+                }
+            } catch (error) {
+                console.log(error.message);
+                // Fallback to local storage (for testing offline before uploading to GitHub)
+                loadLocalData();
+            }
+
+            updateVocabStructure();
+            document.getElementById('nav-buttons').style.display = 'block';
+            switchScreen('login');
+        }
+
+        function loadLocalData() {
+            const savedVocab = localStorage.getItem('foochowVocab');
+            const savedThemes = localStorage.getItem('foochowThemes');
+            const savedPass = localStorage.getItem('foochowAdminPass');
+            const savedLeaderboard = localStorage.getItem('foochowLeaderboard');
+
+            if (savedThemes) dbThemes = JSON.parse(savedThemes);
+            if (savedVocab) vocabData = JSON.parse(savedVocab);
+            if (savedPass) adminPassword = savedPass;
+            if (savedLeaderboard) leaderboard = JSON.parse(savedLeaderboard);
+
+            // Initialize default data if completely empty
+            if (Object.keys(vocabData).length === 0) {
+                dbThemes.forEach(t => vocabData[t] = []);
+            }
+        }
+
+        function saveDataLocally() {
+            localStorage.setItem('foochowVocab', JSON.stringify(vocabData));
+            localStorage.setItem('foochowThemes', JSON.stringify(dbThemes));
+            localStorage.setItem('foochowAdminPass', adminPassword);
+            localStorage.setItem('foochowLeaderboard', JSON.stringify(leaderboard));
+        }
+
+        // --- EXPORT DATA FOR GITHUB ---
+        function exportData() {
+            const exportObj = {
+                themes: dbThemes,
+                vocabData: vocabData,
+                adminPassword: adminPassword,
+                leaderboard: leaderboard
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "data.json");
+            document.body.appendChild(downloadAnchorNode); // required for firefox
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            
+            showModal("Success!", "Downloaded data.json. Upload this file to your GitHub repository next to your HTML file!");
+        }
+
+        function updateVocabStructure() {
+            dbThemes.forEach(t => {
+                if (!vocabData[t]) vocabData[t] = [];
+            });
+        }
+
+        // Start initialization
+        window.onload = () => {
+            initApp();
+        };
+
+        // --- UI UTILS ---
+        function showModal(title, text) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-text').innerText = text;
+            document.getElementById('custom-modal').style.display = 'flex';
+        }
+        function closeModal() {
+            document.getElementById('custom-modal').style.display = 'none';
+        }
+
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(`screen-${screenId}`).classList.add('active');
+            
+            if(screenId === 'dashboard') loadDashboard();
+            if(screenId === 'admin') loadAdminPanel();
+            if(screenId === 'leaderboard') loadLeaderboard();
+        }
+
+        function toggleAdminLogin() {
+            const section = document.getElementById('admin-login-section');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function login(role) {
+            if (role === 'admin') {
+                const pass = document.getElementById('admin-pass').value;
+                if (pass === adminPassword) { 
+                    document.getElementById('admin-pass').value = '';
+                    document.getElementById('login-msg').innerText = '';
+                    document.getElementById('admin-login-section').style.display = 'none';
+                    switchScreen('admin');
+                } else {
+                    document.getElementById('login-msg').innerText = 'Incorrect Password!';
+                }
+            } else {
+                switchScreen('dashboard');
+            }
+        }
+
+        function changeAdminPassword() {
+            const newPass = document.getElementById('new-admin-pass').value.trim();
+            if (newPass) {
+                adminPassword = newPass;
+                saveDataLocally();
+                
+                document.getElementById('pass-msg').innerText = "Password updated successfully! Remember to export and upload to GitHub.";
+                document.getElementById('new-admin-pass').value = '';
+                setTimeout(() => document.getElementById('pass-msg').innerText = "", 3000);
+            }
+        }
+
+        function addNewTheme() {
+            const newTheme = document.getElementById('new-theme-name').value.trim();
+            const msg = document.getElementById('theme-msg');
+            
+            if (!newTheme) return showModal("Error", "Please enter a theme name!");
+            if (dbThemes.includes(newTheme)) return showModal("Error", "Theme already exists!");
+            
+            dbThemes.push(newTheme);
+            updateVocabStructure();
+            saveDataLocally();
+            loadAdminPanel();
+
+            document.getElementById('new-theme-name').value = '';
+            msg.innerText = "Theme added!";
+            setTimeout(() => msg.innerText = "", 2000);
+        }
+
+        let isRecording = false;
+        let recordedAudioBase64 = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+
+        async function toggleRecording() {
+            const recordBtn = document.getElementById('record-btn');
+            const msgLabel = document.getElementById('admin-msg');
+            
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                    
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = () => {
+                            recordedAudioBase64 = reader.result;
+                            recordBtn.innerHTML = "✅ Audio Ready! (Click to redo)";
+                            recordBtn.className = "secondary";
+                        };
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.innerHTML = "⏹️ Stop Recording...";
+                    recordBtn.className = "danger";
+                    msgLabel.innerText = "Recording... Speak now!";
+                    msgLabel.style.color = "red";
+                } catch (err) {
+                    showModal("Permission Denied", "Microphone access denied. Please check your browser settings.");
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                msgLabel.innerText = "Audio captured successfully!";
+                msgLabel.style.color = "green";
+                setTimeout(() => msgLabel.innerText = "", 2000);
+            }
+        }
+
+        async function addVocab() {
+            const theme = document.getElementById('admin-theme-select').value;
+            const foochow = document.getElementById('admin-foochow').value.trim();
+            const english = document.getElementById('admin-english').value.trim();
+
+            if (!foochow || !english) return showModal("Error", "Please fill in both words!");
+
+            const btn = document.getElementById('save-vocab-btn');
+            btn.disabled = true;
+
+            const generatedImg = `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${encodeURIComponent(english)}`;
+            const newVocab = { id: Date.now().toString(), theme, foochow, english, img: generatedImg, audio: recordedAudioBase64 || null };
+
+            vocabData[theme].push(newVocab);
+            saveDataLocally();
+            renderAdminVocab();
+            
+            document.getElementById('admin-msg').innerText = "Saved successfully!";
+            document.getElementById('admin-msg').style.color = "green";
+            setTimeout(() => document.getElementById('admin-msg').innerText = "", 2000);
+            
+            document.getElementById('admin-foochow').value = '';
+            document.getElementById('admin-english').value = '';
+            recordedAudioBase64 = null;
+            document.getElementById('record-btn').innerHTML = "🎙️ Start Recording";
+            document.getElementById('record-btn').className = "warning";
+            
+            btn.disabled = false;
+            btn.innerText = "➕ Add & Save";
+        }
+
+        function deleteVocab(theme, docId, index) {
+            vocabData[theme].splice(index, 1);
+            saveDataLocally();
+            renderAdminVocab();
+        }
+
+        function loadDashboard() {
+            const grid = document.getElementById('theme-grid');
+            grid.innerHTML = '';
+            dbThemes.forEach(theme => {
+                const count = vocabData[theme] ? vocabData[theme].length : 0;
+                const div = document.createElement('div');
+                div.className = 'theme-card';
+                div.innerHTML = `<span style="font-size: 2rem;">📁</span><br>${theme} <br><small>(${count} words)</small>`;
+                div.onclick = () => openTheme(theme);
+                grid.appendChild(div);
+            });
+        }
+
+        function loadAdminPanel() {
+            const select = document.getElementById('admin-theme-select');
+            select.innerHTML = '';
+            dbThemes.forEach(theme => {
+                const opt = document.createElement('option');
+                opt.value = theme; opt.innerText = theme;
+                select.appendChild(opt);
+            });
+            renderAdminVocab();
+        }
+
+        function renderAdminVocab() {
+            const list = document.getElementById('admin-vocab-list');
+            list.innerHTML = '';
+            Object.keys(vocabData).forEach(theme => {
+                if (!vocabData[theme]) return;
+                vocabData[theme].forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'vocab-list-item';
+                    div.innerHTML = `
+                        <span><strong>[${theme}]</strong> ${item.foochow} = ${item.english} ${item.audio ? '🎵' : ''}</span>
+                        <button class="danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="deleteVocab('${theme}', '${item.id}', ${index})">Delete</button>
+                    `;
+                    list.appendChild(div);
+                });
+            });
+        }
+
+        function openTheme(theme) {
+            switchScreen('theme');
+            document.getElementById('theme-title').innerText = theme;
+            const list = document.getElementById('learning-list');
+            list.innerHTML = '';
+            
+            if (!vocabData[theme] || vocabData[theme].length === 0) {
+                list.innerHTML = "<p style='grid-column: 1 / -1; text-align: center;'>No words yet! Admin needs to add some.</p>";
+                return;
+            }
+
+            vocabData[theme].forEach(item => {
+                const card = document.createElement('div');
+                card.style.cssText = "background: white; padding: 15px; border-radius: 10px; text-align: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1);";
+                card.innerHTML = `
+                    <img src="${item.img}" style="width:80px; height:80px; border-radius:50%; object-fit:cover;">
+                    <h3 style="margin:10px 0 5px 0;">${item.foochow}</h3>
+                    <p style="margin:0; color:gray;">${item.english}</p>
+                    <p style="font-size:12px; color:var(--secondary);">🔊 Click to Listen</p>
+                `;
+                
+                card.onclick = () => {
+                    if (item.audio) {
+                        const snd = new Audio(item.audio);
+                        snd.play();
+                    } else {
+                        const utterance = new SpeechSynthesisUtterance(item.foochow);
+                        utterance.lang = 'zh-CN'; 
+                        speechSynthesis.speak(utterance);
+                    }
+                };
+                list.appendChild(card);
+            });
+        }
+
+        let quizPool = [];
+        let currentQuestion = 0;
+        let score = 0;
+        let maxQuestions = 20;
+
+        function startQuizSetup() { switchScreen('quiz-setup'); }
+
+        function startQuiz(level) {
+            quizPool = [];
+            Object.keys(vocabData).forEach(t => {
+                if(vocabData[t]) quizPool = quizPool.concat(vocabData[t]);
+            });
+
+            if (quizPool.length < 3) {
+                showModal("Not enough words!", "You need at least 3 vocabulary words in the app to play games.");
+                switchScreen('dashboard');
+                return;
+            }
+
+            quizPool = quizPool.sort(() => 0.5 - Math.random());
+            maxQuestions = Math.min(20, quizPool.length);
+            
+            currentQuestion = 0;
+            score = 0;
+            switchScreen('quiz');
+            loadNextQuestion();
+        }
+
+        function loadNextQuestion() {
+            if (currentQuestion >= maxQuestions) {
+                endQuiz();
+                return;
+            }
+
+            document.getElementById('q-counter').innerText = `${currentQuestion + 1} / ${maxQuestions}`;
+            document.getElementById('q-score').innerText = score;
+            
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+
+            const gameType = Math.floor(Math.random() * 3) + 1;
+            const currentVocab = quizPool[currentQuestion];
+
+            if (gameType === 1) {
+                board.innerHTML = `<h2>Pop the balloon for: "${currentVocab.english}" 🎈</h2>`;
+                const arena = document.createElement('div');
+                arena.style.cssText = "position: relative; width: 100%; height: 300px; overflow: hidden; background: #e0f7fa; border-radius: 10px; border: 2px solid var(--secondary);";
+                
+                let options = getWrongAnswers(currentVocab, 3);
+                options.push(currentVocab);
+                options = options.sort(() => 0.5 - Math.random());
+
+                options.forEach((opt, idx) => {
+                    const balloon = document.createElement('div');
+                    const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#A8E6CF'];
+                    balloon.className = 'balloon';
+                    balloon.style.backgroundColor = colors[idx % colors.length];
+                    balloon.style.left = `${10 + (idx * 20)}%`;
+                    balloon.style.animationDuration = `${4 + Math.random() * 4}s`; 
+                    balloon.style.animationDelay = `${Math.random() * 1.5}s`;
+                    balloon.innerText = opt.foochow;
+                    
+                    balloon.onclick = () => {
+                        balloon.style.transform = "scale(1.5)";
+                        balloon.style.opacity = "0"; 
+                        setTimeout(() => checkAnswer(opt.english === currentVocab.english), 300);
+                    };
+                    arena.appendChild(balloon);
+                });
+                board.appendChild(arena);
+            } 
+            else if (gameType === 2) {
+                board.innerHTML = `<h2>Find the hidden picture for: ${currentVocab.foochow} 🔍</h2>`;
+                const arena = document.createElement('div');
+                arena.style.cssText = "position: relative; width: 100%; height: 300px; background: #fff3e0; border-radius: 10px; border: 2px dashed #ffb74d;";
+                
+                let options = getWrongAnswers(currentVocab, 5); 
+                options.push(currentVocab);
+                options = options.sort(() => 0.5 - Math.random());
+
+                options.forEach(opt => {
+                    const img = document.createElement('img');
+                    img.src = opt.img;
+                    img.className = 'scatter-img';
+                    img.style.position = 'absolute';
+                    img.style.top = `${5 + Math.random() * 70}%`;
+                    img.style.left = `${5 + Math.random() * 75}%`;
+                    img.style.width = '70px';
+                    img.style.height = '70px';
+                    img.style.cursor = 'pointer';
+                    img.onclick = () => checkAnswer(opt.english === currentVocab.english);
+                    arena.appendChild(img);
+                });
+                board.appendChild(arena);
+            }
+            else {
+                window.currentTargetVocab = currentVocab; 
+                board.innerHTML = `
+                    <h2>Say it out loud! 🎤</h2>
+                    <h1 style="font-size: 3rem; margin: 10px;">${currentVocab.foochow}</h1>
+                    <p style="color: gray; font-size: 1.2rem;">English: ${currentVocab.english}</p>
+                    <img src="${currentVocab.img}" style="width: 100px; height:100px; border-radius:10px;">
+                    <br><br>
+                    <button id="user-record-btn" class="warning" style="padding: 15px 30px; font-size: 1.2rem;" onclick="startUserRecording()">🎙️ Start Recording</button>
+                    
+                    <div id="self-grade" style="display:none; margin-top:20px; background: #f9f9f9; padding: 15px; border-radius: 10px;">
+                        <h3 style="margin-top:0;">Did you sound like the original?</h3>
+                        <button class="secondary" onclick="playComparison()">▶️ Listen Again (Yours vs Correct)</button><br>
+                        <button class="warning" onclick="checkAnswer(true)">✅ Yes, I got it! (+10)</button>
+                        <button class="danger" onclick="checkAnswer(false)">❌ No, needs practice</button>
+                    </div>
+                    <br>
+                    <button class="secondary" style="margin-top: 20px; font-size: 0.9rem;" onclick="checkAnswer(false)">Skip Question</button>
+                `;
+            }
+        }
+
+        function getWrongAnswers(correctItem, count) {
+            let wrongs = quizPool.filter(item => item.english !== correctItem.english);
+            wrongs = wrongs.sort(() => 0.5 - Math.random()).slice(0, count);
+            while (wrongs.length < count) {
+                wrongs.push({ english: "Something else", foochow: "Unknown", img: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Wrong" });
+            }
+            return wrongs;
+        }
+
+        function checkAnswer(isCorrect) {
+            if (isCorrect) score += 10;
+            currentQuestion++;
+            loadNextQuestion();
+        }
+
+        function endQuiz() {
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('player-name').value = '';
+            switchScreen('quiz-end');
+        }
+
+        function saveScore() {
+            const name = document.getElementById('player-name').value.trim();
+            if(!name) {
+                showModal("Missing Name", "Please enter your name to save your score!");
+                return;
+            }
+            
+            leaderboard.push({ name: name, score: score, timestamp: Date.now() });
+            leaderboard = leaderboard.sort((a, b) => b.score - a.score).slice(0, 10);
+            saveDataLocally();
+            
+            switchScreen('leaderboard');
+        }
+
+        function loadLeaderboard() {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = '';
+            if (leaderboard.length === 0) {
+                list.innerHTML = "<p style='text-align:center;'>No scores yet. Be the first!</p>";
+                return;
+            }
+            leaderboard.forEach((entry, i) => {
+                list.innerHTML += `<h2 style="color: var(--dark); margin:10px 0;">#${i+1} ${entry.name} - ${entry.score} pts</h2><hr>`;
+            });
+        }
+
+        let userRecorder = null;
+        let userChunks = [];
+        let userAudioUrl = null;
+        let isUserRecording = false;
+
+        async function startUserRecording() {
+            const btn = document.getElementById('user-record-btn');
+            
+            if (!isUserRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    userRecorder = new MediaRecorder(stream);
+                    userChunks = [];
+                    
+                    userRecorder.ondataavailable = e => { if (e.data.size > 0) userChunks.push(e.data); };
+                    
+                    userRecorder.onstop = () => {
+                        const audioBlob = new Blob(userChunks, { type: 'audio/webm' });
+                        userAudioUrl = URL.createObjectURL(audioBlob);
+                        
+                        btn.style.display = 'none'; 
+                        document.getElementById('self-grade').style.display = 'block';
+                        playComparison(); 
+                        
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+                    
+                    userRecorder.start();
+                    isUserRecording = true;
+                    btn.innerHTML = "⏹️ Stop Recording...";
+                    btn.className = "danger";
+                    btn.style.transform = "scale(1.1)";
+                } catch (err) {
+                    showModal("Mic Error", "Microphone access denied! Try playing a different game type.");
+                    checkAnswer(false);
+                }
+            } else {
+                userRecorder.stop();
+                isUserRecording = false;
+            }
+        }
+
+        function playComparison() {
+            const userAudio = new Audio(userAudioUrl);
+            userAudio.play();
+            
+            userAudio.onended = () => {
+                setTimeout(() => {
+                    if (window.currentTargetVocab && window.currentTargetVocab.audio) {
+                        const correctAudio = new Audio(window.currentTargetVocab.audio);
+                        correctAudio.play();
+                    } else {
+                        const utterance = new SpeechSynthesisUtterance(window.currentTargetVocab.foochow);
+                        utterance.lang = 'zh-CN'; 
+                        speechSynthesis.speak(utterance);
+                    }
+                }, 500); 
+            };
+        }
+    </script>
+</body>
+</html>
