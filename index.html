@@ -104,6 +104,25 @@
         }
         @keyframes floatUp { to { bottom: 120%; } }
         
+        .static-balloon {
+            width: 90px; height: 110px;
+            border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--dark); font-weight: bold; cursor: pointer;
+            box-shadow: inset -10px -10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.2);
+            text-align: center; font-size: 1rem; padding: 5px; line-height: 1.1;
+            transition: transform 0.2s;
+            position: relative;
+            background-color: #4ECDC4;
+            margin: 0 auto;
+            margin-bottom: 25px;
+        }
+        .static-balloon::after {
+            content: ''; position: absolute; bottom: -20px; left: 50%;
+            transform: translateX(-50%); width: 2px; height: 30px; background: gray;
+        }
+        .static-balloon:hover { transform: scale(1.1); }
+
         .scatter-img {
             transition: transform 0.2s;
             border-radius: 10px;
@@ -226,9 +245,9 @@
             <h1>Quiz Time! 🧠</h1>
             <div style="text-align: center; background: white; padding: 30px; border-radius: 15px;">
                 <h3>Select Difficulty</h3>
-                <button onclick="startQuiz('easy')">Easy (Slow Time)</button>
-                <button class="warning" onclick="startQuiz('medium')">Medium (Normal)</button>
-                <button class="danger" onclick="startQuiz('hard')">Hard (Fast!)</button>
+                <button onclick="startQuiz('easy')">Level 1: Listen & Match</button>
+                <button class="warning" onclick="startQuiz('medium')">Level 2: Moving Balloons</button>
+                <button class="danger" onclick="startQuiz('hard')">Level 3: Pronunciation</button>
             </div>
         </div>
 
@@ -260,7 +279,7 @@
     </div>
 
     <footer style="background-color: var(--dark); color: white; text-align: center; padding: 15px; font-family: 'Nunito', sans-serif; margin-top: auto;">
-        Foochow Hero Learning App: Catherine NCL (2026)
+        Foochow Hero Learning App: Catherine NCL. (2026)
     </footer>
 
     <!-- Custom Alert Modal -->
@@ -594,10 +613,44 @@
         let currentQuestion = 0;
         let score = 0;
         let maxQuestions = 20;
+        let currentLevelType = 1;
+
+        // --- SOUND EFFECTS ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playGameSound(isCorrect) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            if (isCorrect) {
+                // Happy "Ding-Ding!" for correct answers
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15); // E5
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.5);
+            } else {
+                // Low "Buzz" for wrong answers
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime); 
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            }
+        }
 
         function startQuizSetup() { switchScreen('quiz-setup'); }
 
         function startQuiz(level) {
+            if (level === 'easy') currentLevelType = 1;
+            else if (level === 'medium') currentLevelType = 2;
+            else if (level === 'hard') currentLevelType = 3;
+
             quizPool = [];
             Object.keys(vocabData).forEach(t => {
                 if(vocabData[t]) quizPool = quizPool.concat(vocabData[t]);
@@ -630,27 +683,60 @@
             const board = document.getElementById('game-board');
             board.innerHTML = '';
 
-            const gameType = Math.floor(Math.random() * 3) + 1;
             const currentVocab = quizPool[currentQuestion];
+            window.currentTargetVocab = currentVocab; 
 
-            if (gameType === 1) {
-                board.innerHTML = `<h2>Pop the balloon for: "${currentVocab.english}" 🎈</h2>`;
-                const arena = document.createElement('div');
-                arena.style.cssText = "position: relative; width: 100%; height: 300px; overflow: hidden; background: #e0f7fa; border-radius: 10px; border: 2px solid var(--secondary);";
+            if (currentLevelType === 1) {
+                // LEVEL 1: Static Matching (Click Audio -> Find Word)
+                board.innerHTML = `
+                    <h2>Level 1: Listen & Match 👂</h2>
+                    <p style="color: gray; margin-top: 0;">Click the sound button, then click the correct English balloon!</p>
+                    <button class="warning" style="font-size: 3rem; padding: 20px 40px; border-radius: 50px; margin-bottom: 30px; box-shadow: 0 8px 15px rgba(0,0,0,0.2);" onclick="playVocabAudio()">🔊</button>
+                    <div id="static-options" class="grid" style="gap: 20px; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));"></div>
+                `;
                 
+                const optionsDiv = document.getElementById('static-options');
                 let options = getWrongAnswers(currentVocab, 3);
+                options.push(currentVocab);
+                options = options.sort(() => 0.5 - Math.random());
+
+                const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#A8E6CF'];
+                options.forEach((opt, idx) => {
+                    const balloon = document.createElement('div');
+                    balloon.className = 'static-balloon';
+                    balloon.style.backgroundColor = colors[idx % colors.length];
+                    balloon.innerText = opt.english;
+                    balloon.onclick = () => checkAnswer(opt.english === currentVocab.english);
+                    optionsDiv.appendChild(balloon);
+                });
+                
+                // Auto-play audio on question load for Level 1
+                setTimeout(playVocabAudio, 500);
+            } 
+            else if (currentLevelType === 2) {
+                // LEVEL 2: Moving Balloons
+                board.innerHTML = `
+                    <h2>Level 2: Pop the Balloon! 🎈</h2>
+                    <p style="color: gray; margin-bottom: 5px;">Find the matching meaning for:</p>
+                    <h3 style="font-size: 2rem; margin: 0 0 10px 0;">${currentVocab.foochow}</h3>
+                    <button class="secondary" style="margin-bottom: 15px;" onclick="playVocabAudio()">🔊 Listen</button>
+                `;
+                const arena = document.createElement('div');
+                arena.style.cssText = "position: relative; width: 100%; height: 350px; overflow: hidden; background: #e0f7fa; border-radius: 10px; border: 2px solid var(--secondary);";
+                
+                let options = getWrongAnswers(currentVocab, 4); // 5 balloons total
                 options.push(currentVocab);
                 options = options.sort(() => 0.5 - Math.random());
 
                 options.forEach((opt, idx) => {
                     const balloon = document.createElement('div');
-                    const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#A8E6CF'];
+                    const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#A8E6CF', '#FFA07A'];
                     balloon.className = 'balloon';
                     balloon.style.backgroundColor = colors[idx % colors.length];
-                    balloon.style.left = `${10 + (idx * 20)}%`;
-                    balloon.style.animationDuration = `${4 + Math.random() * 4}s`; 
+                    balloon.style.left = `${4 + (idx * 19)}%`;
+                    balloon.style.animationDuration = `${3.5 + Math.random() * 3}s`; // Staggered speeds
                     balloon.style.animationDelay = `${Math.random() * 1.5}s`;
-                    balloon.innerText = opt.foochow;
+                    balloon.innerText = opt.english;
                     
                     balloon.onclick = () => {
                         balloon.style.transform = "scale(1.5)";
@@ -660,50 +746,39 @@
                     arena.appendChild(balloon);
                 });
                 board.appendChild(arena);
-            } 
-            else if (gameType === 2) {
-                board.innerHTML = `<h2>Find the hidden picture for: ${currentVocab.foochow} 🔍</h2>`;
-                const arena = document.createElement('div');
-                arena.style.cssText = "position: relative; width: 100%; height: 300px; background: #fff3e0; border-radius: 10px; border: 2px dashed #ffb74d;";
-                
-                let options = getWrongAnswers(currentVocab, 5); 
-                options.push(currentVocab);
-                options = options.sort(() => 0.5 - Math.random());
-
-                options.forEach(opt => {
-                    const img = document.createElement('img');
-                    img.src = opt.img;
-                    img.className = 'scatter-img';
-                    img.style.position = 'absolute';
-                    img.style.top = `${5 + Math.random() * 70}%`;
-                    img.style.left = `${5 + Math.random() * 75}%`;
-                    img.style.width = '70px';
-                    img.style.height = '70px';
-                    img.style.cursor = 'pointer';
-                    img.onclick = () => checkAnswer(opt.english === currentVocab.english);
-                    arena.appendChild(img);
-                });
-                board.appendChild(arena);
             }
             else {
-                window.currentTargetVocab = currentVocab; 
+                // LEVEL 3: Pronunciation Self-Grade
                 board.innerHTML = `
-                    <h2>Say it out loud! 🎤</h2>
+                    <h2>Level 3: Say it out loud! 🎤</h2>
                     <h1 style="font-size: 3rem; margin: 10px;">${currentVocab.foochow}</h1>
                     <p style="color: gray; font-size: 1.2rem;">English: ${currentVocab.english}</p>
-                    <img src="${currentVocab.img}" style="width: 100px; height:100px; border-radius:10px;">
-                    <br><br>
+                    <img src="${currentVocab.img}" style="width: 100px; height:100px; border-radius:10px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <br>
                     <button id="user-record-btn" class="warning" style="padding: 15px 30px; font-size: 1.2rem;" onclick="startUserRecording()">🎙️ Start Recording</button>
                     
-                    <div id="self-grade" style="display:none; margin-top:20px; background: #f9f9f9; padding: 15px; border-radius: 10px;">
+                    <div id="self-grade" style="display:none; margin-top:20px; background: #f9f9f9; padding: 15px; border-radius: 10px; border: 2px dashed #ccc;">
                         <h3 style="margin-top:0;">Did you sound like the original?</h3>
                         <button class="secondary" onclick="playComparison()">▶️ Listen Again (Yours vs Correct)</button><br>
-                        <button class="warning" onclick="checkAnswer(true)">✅ Yes, I got it! (+10)</button>
+                        <button class="warning" onclick="checkAnswer(true)" style="margin-top: 10px;">✅ Yes, I got it! (+10)</button>
                         <button class="danger" onclick="checkAnswer(false)">❌ No, needs practice</button>
                     </div>
                     <br>
                     <button class="secondary" style="margin-top: 20px; font-size: 0.9rem;" onclick="checkAnswer(false)">Skip Question</button>
                 `;
+            }
+        }
+
+        function playVocabAudio() {
+            if (window.currentTargetVocab) {
+                if (window.currentTargetVocab.audio) {
+                    const snd = new Audio(window.currentTargetVocab.audio);
+                    snd.play();
+                } else {
+                    const utterance = new SpeechSynthesisUtterance(window.currentTargetVocab.foochow);
+                    utterance.lang = 'zh-CN'; 
+                    speechSynthesis.speak(utterance);
+                }
             }
         }
 
@@ -717,9 +792,15 @@
         }
 
         function checkAnswer(isCorrect) {
+            playGameSound(isCorrect); // Play the right/wrong sound
+            
             if (isCorrect) score += 10;
-            currentQuestion++;
-            loadNextQuestion();
+            
+            // Wait half a second so the user hears the sound before the next question loads
+            setTimeout(() => {
+                currentQuestion++;
+                loadNextQuestion();
+            }, 500);
         }
 
         function endQuiz() {
@@ -750,7 +831,8 @@
                 return;
             }
             leaderboard.forEach((entry, i) => {
-                list.innerHTML += `<h2 style="color: var(--dark); margin:10px 0;">#${i+1} ${entry.name} - ${entry.score} pts</h2><hr>`;
+                let medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
+                list.innerHTML += `<h2 style="color: var(--dark); margin:10px 0;">${medal} #${i+1} ${entry.name} - ${entry.score} pts</h2><hr style="border-top: 1px dashed #ccc;">`;
             });
         }
 
